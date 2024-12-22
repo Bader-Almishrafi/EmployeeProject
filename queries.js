@@ -20,43 +20,123 @@ const db = new pool({
     });
 };*/
 
+// const getEmpById = (request, response) => {
+//     const id =request.query.id
+
+//     if(id){
+//     if (isNaN(id)) {
+//         const responseObj = new Response(false, 400, "Invalid ID", null);
+//         return response.status(400).json(responseObj);
+//     }
+
+//     db.query("SELECT * FROM employees WHERE id = $1", [id], (error, results) => {
+//         if (error) {
+//             console.error("Error fetching employee:", error);
+//             const responseObj = new Response(false, 500, "Server Error", null);
+//             return response.status(500).json(responseObj);
+//         }
+
+//         if (results.rowCount === 0) {
+//             const responseObj = new Response(false, 404, "Employee not found", null);
+//             return response.status(404).json(responseObj);
+//         }
+
+       
+
+//         const responseObj = new Response(true, 200, "Employee fetched successfully", results.rows[0]);
+//         response.status(200).json(responseObj);
+//     })}
+//     else{
+//         db.query("SELECT * FROM employees ORDER BY id ASC", (error, results) => {
+//             if (error) {
+//                 console.error("Error fetching employees:", error);
+//                 const responseObj = new Response(false, 500, "Server Error", null);
+//                 return response.status(500).json(responseObj);
+//             }
+
+             
+            
+//             const responseObj = new Response(true, 200, "Employees fetched successfully", results.rows);
+//             response.status(200).json(responseObj);
+//         });
+//     }
+// };
+
 const getEmpById = (request, response) => {
-    const id =request.query.id
-    if(id){
-    if (isNaN(id)) {
-        const responseObj = new Response(false, 400, "Invalid ID", null);
-        return response.status(400).json(responseObj);
-    }
-    db.query("SELECT * FROM employees WHERE id = $1", [id], (error, results) => {
-        if (error) {
-            console.error("Error fetching employee:", error);
-            const responseObj = new Response(false, 500, "Server Error", null);
-            return response.status(500).json(responseObj);
+    const { id, image } = request.query;
+
+    if (id) {
+        if (isNaN(id)) {
+            const responseObj = new Response(false, 400, "Invalid ID", null);
+            return response.status(400).json(responseObj);
         }
 
-        if (results.rowCount === 0) {
-            const responseObj = new Response(false, 404, "Employee not found", null);
-            return response.status(404).json(responseObj);
-        }
+        if (image === "true") {
+            db.query("SELECT image FROM employees WHERE id = $1", [id], (error, results) => {
+                if (error) {
+                    console.error("Error fetching image:", error);
+                    return response.status(500).json({ success: false, message: "Server Error" });
+                }
 
-        const responseObj = new Response(true, 200, "Employee fetched successfully", results.rows[0]);
-        response.status(200).json(responseObj);
-    })}
-    else{
-        db.query("SELECT * FROM employees ORDER BY id ASC", (error, results) => {
-            if (error) {
-                console.error("Error fetching employees:", error);
-                const responseObj = new Response(false, 500, "Server Error", null);
-                return response.status(500).json(responseObj);
+                if (results.rowCount === 0) {
+                    return response.status(404).json({ success: false, message: "Image not found" });
+                }
+
+                const img = results.rows[0].image;
+                response.set("Content-Type", "image/jpeg"); 
+                return response.send(img);
+            });
+        } else {
+            db.query(
+                "SELECT id, fname, lname, position, salary FROM employees WHERE id = $1",
+                [id],
+                (error, results) => {
+                    if (error) {
+                        console.error("Error fetching employee:", error);
+                        const responseObj = new Response(false, 500, "Server Error", null);
+                        return response.status(500).json(responseObj);
+                    }
+
+                    if (results.rowCount === 0) {
+                        const responseObj = new Response(false, 404, "Employee not found", null);
+                        return response.status(404).json(responseObj);
+                    }
+
+                    const employee = results.rows[0];
+                    employee.imageLink = `${request.protocol}://${request.get("host")}/employee?id=${employee.id}&image=true`;
+
+                    const responseObj = new Response(true, 200, "Employee fetched successfully", employee);
+                    return response.status(200).json(responseObj);
+                }
+            );
+        }
+    } else {
+        db.query(
+            "SELECT id, fname, lname, position, salary FROM employees ORDER BY id ASC",
+            (error, results) => {
+                if (error) {
+                    console.error("Error fetching employees:", error);
+                    const responseObj = new Response(false, 500, "Server Error", null);
+                    return response.status(500).json(responseObj);
+                }
+
+                const employees = results.rows.map(employee => {
+                    employee.imageLink = `${request.protocol}://${request.get("host")}/employee?id=${employee.id}&image=true`;
+                    return employee;
+                });
+
+                const responseObj = new Response(true, 200, "Employees fetched successfully", employees);
+                return response.status(200).json(responseObj);
             }
-            const responseObj = new Response(true, 200, "Employees fetched successfully", results.rows);
-            response.status(200).json(responseObj);
-        });
+        );
     }
 };
 
+
+
 const createEmp = (request, response) => {
     const { fname, lname, position, salary } = request.body;
+    const imageBuffer = request.file.buffer;
 
     if (!fname || !lname || !position || !salary) {
         const responseObj = new Response(false, 400, "All fields are required", null);
@@ -70,7 +150,7 @@ const createEmp = (request, response) => {
         return response.status(500).json(responseObj);
          }
 
-    const maxId = results.rows[0].max_id || 0;  
+    const maxId = 0 || results.rows[0].max_id;  
 
     db.query(
         "SELECT setval('employees_id_seq', $1)", 
@@ -81,10 +161,11 @@ const createEmp = (request, response) => {
                 const responseObj = new Response(false, 500, "Server Error", null);
                 return response.status(500).json(responseObj);
             }
-
+            const salary1 = salary-(salary*0.01)
+            const Rsalary = Math.round(salary1)
             db.query(
-                "INSERT INTO employees (fname, lname, position, salary) VALUES ($1, $2, $3, $4) RETURNING id",
-                [fname, lname, position, salary-(salary*0.01)],
+                "INSERT INTO employees (fname, lname, position, salary, image) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                [fname, lname, position, Rsalary ,imageBuffer],
                 (error, results) => {
                     if (error) {
                         console.error("Error adding employee:", error);
