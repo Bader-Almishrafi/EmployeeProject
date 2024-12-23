@@ -1,4 +1,5 @@
 const pool = require("pg").Pool;
+const { request, response } = require("express");
 const Response = require("./mode/Response")
 const db = new pool({
     user:'postgres',
@@ -133,15 +134,24 @@ const getEmpById = (request, response) => {
 };
 
 
+const fs = require("fs");
+const path = require("path");
 
 const createEmp = (request, response) => {
     const { fname, lname, position, salary } = request.body;
-    const imageBuffer = request.file.buffer;
+    let imageBuffer = request.file ? request.file.buffer : null;
 
     if (!fname || !lname || !position || !salary) {
         const responseObj = new Response(false, 400, "All fields are required", null);
         return response.status(400).json(responseObj);
     }
+
+    if (!imageBuffer) {
+        const defaultImagePath = path.join(__dirname, './defaultImage/defaultImage.jpg');
+        imageBuffer = fs.readFileSync(defaultImagePath);
+    }
+
+
 
     db.query("SELECT MAX(id) AS max_id FROM employees", (error, results) => {
         if (error) {
@@ -163,6 +173,7 @@ const createEmp = (request, response) => {
             }
             const salary1 = salary-(salary*0.01)
             const Rsalary = Math.round(salary1)
+
             db.query(
                 "INSERT INTO employees (fname, lname, position, salary, image) VALUES ($1, $2, $3, $4, $5) RETURNING id",
                 [fname, lname, position, Rsalary ,imageBuffer],
@@ -200,75 +211,162 @@ const createEmp = (request, response) => {
             response.status(201).json(responseObj);
         }
     );*/
-//};
+/*;*/
+
+// const updateEmp = (request, response) => {
+//     const id = request.query.id
+//     const { fname, lname, position, salary } = request.body;
+//     // const {position,salary} = request.body;
+//     // const imageBuffer = request.file.buffer;
+//     if (fname && lname && position && salary) {
+//         db.query(
+//             "UPDATE employees SET fanme = $1, lanme = $2, position = $3, salar = $4 WHERE id = $5",
+//             [fname, lname, position, salary-(salary*0.01), id],
+//             (error, results) => {
+//                 if (error) {
+//                     console.error("Error updating employee:", error);
+//                     const responseObj = new Response(false, 500, "Server Error", null);
+//                     return response.status(500).json(responseObj);
+//                 }
+    
+//                 if (results.rowCount === 0) {
+//                     const responseObj = new Response(false, 404, "Employee not found", null);
+//                     return response.status(404).json(responseObj);
+//                 }
+    
+//                 const responseObj = new Response(true, 200, "Employee updated successfully", null);
+//                 response.status(200).json(responseObj);
+//             }
+//         );
+//     }
+//     else if(position && salary){
+//     db.query(
+//         "UPDATE employees SET position = $1, salary = $2 WHERE id = $3",
+//         [position, salary-(salary*0.01), id],
+//         (error, results) => {
+//             if (error) {
+//                 console.error("Error updating employee Position and salary:", error);
+//                 const responseObj = new Response(false, 500, "Server Error", null);
+//                 return response.status(500).json(responseObj);
+//             }
+
+//             if (results.rowCount === 0) {
+//                 const responseObj = new Response(false, 404, "Employee not found", null);
+//                 return response.status(404).json(responseObj);
+//             }
+
+//             const responseObj = new Response(true, 200, "Employee updated successfully", null);
+//             response.status(200).json(responseObj);
+//         }
+//     );}
+//     else if (position){
+//         db.query("UPDATE employees SET position = $1 WHERE id = $2",
+//             [position,id],(error, results) =>{
+//                 if(error){
+//                     console.error("Error updating employee Position",error);
+//                     const responseObj = new Response(false, 500, "Server Error", null);
+//                     return response.status(500).json(responseObj);
+//                 }
+//                 if (results.rowCount === 0) {
+//                     const responseObj = new Response(false, 404, "Employee not found", null);
+//                     return response.status(404).json(responseObj);
+//                 }
+                
+//                 const responseObj = new Response(true, 200, "Employee updated successfully", null);
+//                 response.status(200).json(responseObj);
+//             }
+
+//         )
+//     }
+//     else if(salary){
+//         db.query("UPDATE employees SET salary = $1 WHERE id = $2",
+//             [salary-(salary*0.01),id],(error, results) =>{
+//                 if(error){
+//                     console.error("Error updating employee salary",error);
+//                     const responseObj = new Response(false, 500, "Server Error", null);
+//                     return response.status(500).json(responseObj);
+//                 }
+//                 if (results.rowCount === 0) {
+//                     const responseObj = new Response(false, 404, "Employee not found", null);
+//                     return response.status(404).json(responseObj);
+//                 }
+                
+//                 const responseObj = new Response(true, 200, "Employee updated successfully", null);
+//                 response.status(200).json(responseObj);
+//             }
+
+//         )
+//     }
+// };
 
 const updateEmp = (request, response) => {
-    const id = request.query.id
-    //const { fname, lname, position, salary } = request.body;
-    const {position,salary} = request.body;
-    /*if (!fname || !lname || !position || !salary) {
-        const responseObj = new Response(false, 400, "All fields are required", null);
+    const { id } = request.query; 
+    const { fname, lname, position, salary } = request.body; 
+    const imageBuffer = request.file ? request.file.buffer : null; 
+
+    if (!id) {
+        const responseObj = new Response(false, 400, "Employee ID is required", null);
         return response.status(400).json(responseObj);
-    }*/
-    if(position && salary){
-    db.query(
-        "UPDATE employees SET position = $1, salary = $2 WHERE id = $3",
-        [position, salary-(salary*0.01), id],
-        (error, results) => {
-            if (error) {
-                console.error("Error updating employee Position and salary:", error);
-                const responseObj = new Response(false, 500, "Server Error", null);
-                return response.status(500).json(responseObj);
-            }
+    }
 
-            if (results.rowCount === 0) {
-                const responseObj = new Response(false, 404, "Employee not found", null);
-                return response.status(404).json(responseObj);
-            }
+    const fields = [];
+    const values = [];
+    let valueIndex = 1;
 
-            const responseObj = new Response(true, 200, "Employee updated successfully", null);
-            response.status(200).json(responseObj);
+    if (fname) {
+        fields.push(`fname = $${valueIndex++}`);
+        values.push(fname);
+    }
+    if (lname) {
+        fields.push(`lname = $${valueIndex++}`);
+        values.push(lname);
+    }
+    if (position) {
+        fields.push(`position = $${valueIndex++}`);
+        values.push(position);
+    }
+    if (salary) {
+        const salary1 = salary - (salary * 0.01);
+        const Rsalary = Math.round(salary1);
+        fields.push(`salary = $${valueIndex++}`);
+        values.push(Rsalary);
+    }
+    if (imageBuffer) {
+        fields.push(`image = $${valueIndex++}`);
+        values.push(imageBuffer);
+    }
+
+    if (fields.length === 0) {
+        const responseObj = new Response(false, 400, "No fields to update", null);
+        return response.status(400).json(responseObj);
+    }
+
+    const updateQuery = `
+        UPDATE employees
+        SET ${fields.join(", ")}
+        WHERE id = $${valueIndex}
+        RETURNING id
+    `;
+    values.push(id);
+
+    db.query(updateQuery, values, (error, results) => {
+        if (error) {
+            console.error("Error updating employee:", error);
+            const responseObj = new Response(false, 500, "Server Error", null);
+            return response.status(500).json(responseObj);
         }
-    );}
-    else if (position){
-        db.query("UPDATE employees SET position = $1 WHERE id = $2",
-            [position,id],(error, results) =>{
-                if(error){
-                    console.error("Error updating employee Position",error);
-                    const responseObj = new Response(false, 500, "Server Error", null);
-                    return response.status(500).json(responseObj);
-                }
-                if (results.rowCount === 0) {
-                    const responseObj = new Response(false, 404, "Employee not found", null);
-                    return response.status(404).json(responseObj);
-                }
-                
-                const responseObj = new Response(true, 200, "Employee updated successfully", null);
-                response.status(200).json(responseObj);
-            }
 
-        )
-    }
-    else if(salary){
-        db.query("UPDATE employees SET salary = $1 WHERE id = $2",
-            [salary-(salary*0.01),id],(error, results) =>{
-                if(error){
-                    console.error("Error updating employee salary",error);
-                    const responseObj = new Response(false, 500, "Server Error", null);
-                    return response.status(500).json(responseObj);
-                }
-                if (results.rowCount === 0) {
-                    const responseObj = new Response(false, 404, "Employee not found", null);
-                    return response.status(404).json(responseObj);
-                }
-                
-                const responseObj = new Response(true, 200, "Employee updated successfully", null);
-                response.status(200).json(responseObj);
-            }
+        if (results.rowCount === 0) {
+            const responseObj = new Response(false, 404, "Employee not found", null);
+            return response.status(404).json(responseObj);
+        }
 
-        )
-    }
+        const responseObj = new Response(true, 200, "Employee updated successfully", { id });
+        response.status(200).json(responseObj);
+    });
 };
+
+
 
 const deleteEmp = (request, response) => {
     const id = request.query.id
