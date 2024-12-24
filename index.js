@@ -12,8 +12,7 @@ const port = 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-const storage = multer.memoryStorage();
-const upload = multer({storage});
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
@@ -26,6 +25,6 @@ app.get("/", (request, response) => {
 
 //app.get("/employee", db.getEmp);
 app.get("/employee/", db.getEmpById);
-app.post("/employee",upload.single('image'),db.createEmp);
-app.put("/employee/", upload.single('image'),db.updateEmp);
+app.post("/employee",upload.array('image'),db.createEmp);
+app.put("/employee/", upload.array('image'),db.updateEmp);
 app.delete("/employee/", db.deleteEmp);

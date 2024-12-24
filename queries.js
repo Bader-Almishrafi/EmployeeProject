@@ -137,64 +137,125 @@ const getEmpById = (request, response) => {
 const fs = require("fs");
 const path = require("path");
 
+// const createEmp = (request, response) => {
+//     const { fname, lname, position, salary } = request.body;
+//     let imageBuffer = request.file ? request.file.buffer : null;
+
+//     if (!fname || !lname || !position || !salary) {
+//         const responseObj = new Response(false, 400, "All fields are required", null);
+//         return response.status(400).json(responseObj);
+//     }
+
+//     if (!imageBuffer) {
+//         const defaultImagePath = path.join(__dirname, './defaultImage/defaultImage.jpg');
+//         imageBuffer = fs.readFileSync(defaultImagePath);
+//     }
+
+
+
+//     db.query("SELECT MAX(id) AS max_id FROM employees", (error, results) => {
+//         if (error) {
+//         console.error("Error retrieving max id:", error);
+//         const responseObj = new Response(false, 500, "Server Error", null);
+//         return response.status(500).json(responseObj);
+//          }
+
+//     const maxId = 0 || results.rows[0].max_id;  
+
+//     db.query(
+//         "SELECT setval('employees_id_seq', $1)", 
+//         [maxId],
+//         (error) => {
+//             if (error) {
+//                 console.error("Error resetting sequence:", error);
+//                 const responseObj = new Response(false, 500, "Server Error", null);
+//                 return response.status(500).json(responseObj);
+//             }
+//             const salary1 = salary-(salary*0.01)
+//             const Rsalary = Math.round(salary1)
+
+//             db.query(
+//                 "INSERT INTO employees (fname, lname, position, salary, image) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+//                 [fname, lname, position, Rsalary ,imageBuffer],
+//                 (error, results) => {
+//                     if (error) {
+//                         console.error("Error adding employee:", error);
+//                         const responseObj = new Response(false, 500, "Server Error", null);
+//                         return response.status(500).json(responseObj);
+//                     }
+
+//                     const newId = results.rows[0].id;
+//                     const responseObj = new Response(true, 201, "Employee added successfully", { id: newId });
+//                     response.status(201).json(responseObj);
+//                 }
+//             );
+//         }
+//     );
+// });
+// };
+
 const createEmp = (request, response) => {
     const { fname, lname, position, salary } = request.body;
-    let imageBuffer = request.file ? request.file.buffer : null;
+    let imagesBuffer = [];
 
     if (!fname || !lname || !position || !salary) {
         const responseObj = new Response(false, 400, "All fields are required", null);
         return response.status(400).json(responseObj);
     }
 
-    if (!imageBuffer) {
-        const defaultImagePath = path.join(__dirname, './defaultImage/defaultImage.jpg');
-        imageBuffer = fs.readFileSync(defaultImagePath);
+    if(request.files && request.files.length > 1){
+        const responseObj = new Response(false, 400, "upload one image", null);
+        return response.status(400).json(responseObj);
     }
 
-
+    if (request.files && request.files.length > 0) {
+        imagesBuffer = request.files.map(file => file.buffer);
+    } else {
+        const defaultImagePath = path.join(__dirname, './defaultImage/defaultImage.jpg');
+        imagesBuffer.push(fs.readFileSync(defaultImagePath));
+    }
 
     db.query("SELECT MAX(id) AS max_id FROM employees", (error, results) => {
         if (error) {
-        console.error("Error retrieving max id:", error);
-        const responseObj = new Response(false, 500, "Server Error", null);
-        return response.status(500).json(responseObj);
-         }
-
-    const maxId = 0 || results.rows[0].max_id;  
-
-    db.query(
-        "SELECT setval('employees_id_seq', $1)", 
-        [maxId],
-        (error) => {
-            if (error) {
-                console.error("Error resetting sequence:", error);
-                const responseObj = new Response(false, 500, "Server Error", null);
-                return response.status(500).json(responseObj);
-            }
-            const salary1 = salary-(salary*0.01)
-            const Rsalary = Math.round(salary1)
-
-            db.query(
-                "INSERT INTO employees (fname, lname, position, salary, image) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-                [fname, lname, position, Rsalary ,imageBuffer],
-                (error, results) => {
-                    if (error) {
-                        console.error("Error adding employee:", error);
-                        const responseObj = new Response(false, 500, "Server Error", null);
-                        return response.status(500).json(responseObj);
-                    }
-
-                    const newId = results.rows[0].id;
-                    const responseObj = new Response(true, 201, "Employee added successfully", { id: newId });
-                    response.status(201).json(responseObj);
-                }
-            );
+            console.error("Error retrieving max id:", error);
+            const responseObj = new Response(false, 500, "Server Error", null);
+            return response.status(500).json(responseObj);
         }
-    );
-});
+
+        const maxId = 0 || results.rows[0].max_id;
+
+        db.query(
+            "SELECT setval('employees_id_seq', $1)", 
+            [maxId],
+            (error) => {
+                if (error) {
+                    console.error("Error resetting sequence:", error);
+                    const responseObj = new Response(false, 500, "Server Error", null);
+                    return response.status(500).json(responseObj);
+                }
+                const salary1 = salary - (salary * 0.01);
+                const Rsalary = Math.round(salary1);
+
+                db.query(
+                    "INSERT INTO employees (fname, lname, position, salary, image) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                    [fname, lname, position, Rsalary, imagesBuffer[0]], 
+                    (error, results) => {
+                        if (error) {
+                            console.error("Error adding employee:", error);
+                            const responseObj = new Response(false, 500, "Server Error", null);
+                            return response.status(500).json(responseObj);
+                        }
+
+                        const newId = results.rows[0].id;
+                        const responseObj = new Response(true, 201, "Employee added successfully", { id: newId });
+                        response.status(201).json(responseObj);
+                    }
+                );
+            }
+        );
+    });
 };
 
-    
 
     /*db.query(
         "INSERT INTO employees (fname, lname, position, salary) VALUES ($1, $2, $3, $4) RETURNING id",
@@ -299,10 +360,79 @@ const createEmp = (request, response) => {
 //     }
 // };
 
+// const updateEmp = (request, response) => {
+//     const { id } = request.query; 
+//     const { fname, lname, position, salary } = request.body; 
+//     const imageBuffer = request.file ? request.file.buffer : null; 
+
+//     if (!id) {
+//         const responseObj = new Response(false, 400, "Employee ID is required", null);
+//         return response.status(400).json(responseObj);
+//     }
+
+//     const fields = [];
+//     const values = [];
+//     let valueIndex = 1;
+
+//     if (fname) {
+//         fields.push(`fname = $${valueIndex++}`);
+//         values.push(fname);
+//     }
+//     if (lname) {
+//         fields.push(`lname = $${valueIndex++}`);
+//         values.push(lname);
+//     }
+//     if (position) {
+//         fields.push(`position = $${valueIndex++}`);
+//         values.push(position);
+//     }
+//     if (salary) {
+//         const salary1 = salary - (salary * 0.01);
+//         const Rsalary = Math.round(salary1);
+//         fields.push(`salary = $${valueIndex++}`);
+//         values.push(Rsalary);
+//     }
+//     if (imageBuffer) {
+//         fields.push(`image = $${valueIndex++}`);
+//         values.push(imageBuffer);
+//     }
+
+//     if (fields.length === 0) {
+//         const responseObj = new Response(false, 400, "No fields to update", null);
+//         return response.status(400).json(responseObj);
+//     }
+
+//     const updateQuery = `
+//         UPDATE employees
+//         SET ${fields.join(", ")}
+//         WHERE id = $${valueIndex}
+//         RETURNING id
+//     `;
+//     values.push(id);
+
+//     db.query(updateQuery, values, (error, results) => {
+//         if (error) {
+//             console.error("Error updating employee:", error);
+//             const responseObj = new Response(false, 500, "Server Error", null);
+//             return response.status(500).json(responseObj);
+//         }
+
+//         if (results.rowCount === 0) {
+//             const responseObj = new Response(false, 404, "Employee not found", null);
+//             return response.status(404).json(responseObj);
+//         }
+
+//         const responseObj = new Response(true, 200, "Employee updated successfully", { id });
+//         response.status(200).json(responseObj);
+//     });
+// };
+
 const updateEmp = (request, response) => {
     const { id } = request.query; 
     const { fname, lname, position, salary } = request.body; 
-    const imageBuffer = request.file ? request.file.buffer : null; 
+    const imagesBuffer = request.files && request.files.length > 0 
+        ? request.files.map(file => file.buffer) 
+        : null;
 
     if (!id) {
         const responseObj = new Response(false, 400, "Employee ID is required", null);
@@ -331,9 +461,14 @@ const updateEmp = (request, response) => {
         fields.push(`salary = $${valueIndex++}`);
         values.push(Rsalary);
     }
-    if (imageBuffer) {
+    if(request.files && request.files.length > 1){
+        const responseObj = new Response(false, 400, "upload one image", null);
+        return response.status(400).json(responseObj);
+    }
+
+    if (imagesBuffer && imagesBuffer.length > 0) {
         fields.push(`image = $${valueIndex++}`);
-        values.push(imageBuffer);
+        values.push(imagesBuffer[0]);
     }
 
     if (fields.length === 0) {
@@ -365,7 +500,6 @@ const updateEmp = (request, response) => {
         response.status(200).json(responseObj);
     });
 };
-
 
 
 const deleteEmp = (request, response) => {
